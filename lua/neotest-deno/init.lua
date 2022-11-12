@@ -98,12 +98,19 @@ function DenoNeotestAdapter.build_spec(args)
 	local results_path = get_results_file()
     local position = args.tree:data()
 
+	local command = "deno test --allow-all"
+
+	if position.type == "test" then
+		command = command .. " --filter=" .. position.name
+	end
+
 	return {
-		command = "deno test -A",
+		command = command,
 		context = {
 			results_path = results_path,
-			file = position.path,
+			position = position,
 		},
+		cwd = DenoNeotestAdapter.root(position.path),
 	}
 end
 
@@ -116,26 +123,29 @@ function DenoNeotestAdapter.results(spec, result, tree)
 
     local results = {}
 
+	local test_suite = ''
+
 	local handle = assert(io.open(spec.context.results_path))
 
 	local line = handle:read("l")
 	while line do
 
-		if string.find(line, '%.%.%. .*ok') then
+		if string.find(line, 'running %d+ test') then
+
+			local testfile = string.match(line, 'running %d+ tests? from %.(.+%w+[sx]).-$')
+			test_suite = spec.cwd .. testfile .. "::"
+
+		elseif string.find(line, '%.%.%. .*ok') then
 
 			local test_name = string.match(line, '^(.*) %.%.%. .*$')
-			print(test_name .. " PASS")
-            results[test_name] = {
-                status = "passed",
-            }
+            results[test_suite .. test_name] = { status = "passed" }
+            results[test_suite .. '"' .. test_name .. '"'] = { status = "passed" }
 
 		elseif string.find(line, '%.%.%. .*FAILED') then
 
 			local test_name = string.match(line, '^(.*) %.%.%. .*$')
-            results[test_name] = {
-                status = "failed",
-                --short = testcase.failure[1],
-            }
+            results[test_suite .. test_name] = { status = "failed", } --short = testcase.failure[1],
+            results[test_suite .. '"' .. test_name .. '"'] = { status = "failed", }
 		end
 
 		line = handle:read("l")
