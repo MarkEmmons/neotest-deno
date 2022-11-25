@@ -24,8 +24,18 @@ require("neotest").set({
 
 ## TODO
 
-* Coverage
-* Benchmarks
-* Chai, Sinon.JS or fast-check.
-* Documentation tests
-* DAP support (if possible)
+### Test Support
+
+- [x] Deno.test tests
+- [x] bdd - nested tests
+- [ ] bdd - flat tests
+- [ ] Chai
+- [ ] Sinon.JS
+- [ ] fast-check
+- [ ] Documentation tests
+
+### Features
+
+- [ ] Coverage
+- [ ] Benchmarks
+- [ ] DAP support (if possible)
