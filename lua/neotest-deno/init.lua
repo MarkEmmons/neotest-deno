@@ -114,7 +114,13 @@ function DenoNeotestAdapter.discover_positions(file_path)
 ) @test.definition
 	]]
 
-	return lib.treesitter.parse_positions(file_path, query, { nested_namespaces = true })
+	local position_tree = lib.treesitter.parse_positions(
+		file_path,
+		query,
+		{ nested_namespaces = true }
+	)
+
+	return position_tree
 end
 
 local function get_results_file()
@@ -130,22 +136,55 @@ function DenoNeotestAdapter.build_spec(args)
 
 	local results_path = get_results_file()
     local position = args.tree:data()
+	local strategy = {}
 
-	local command = "deno test --allow-all"
+	local cwd = DenoNeotestAdapter.root(position.path) or ""
+	-- TODO: this needs to work with windows paths too
+	local filename, _ = string.gsub(position.path, cwd .. '/', "")
+
+	-- TODO: Support additional arguments
+    local command_args = vim.tbl_flatten({
+		'test',
+		filename,
+		--vim.list_extend(args.extra_args or {}),
+		'--allow-all',
+    })
+
+	-- TODO: User-defined allows
+	-- if args.allow add allow args
+	-- else --allow-all
 
 	if position.type == "test" then
-		command = command .. " --filter=" .. position.name
+		local test_name = position.name:gsub('^"', ''):gsub('"$', '')
+        vim.list_extend(command_args, { "--filter", test_name })
 	end
 
-	print(position.id)
+	-- BUG: Cannot jump to frame at the end of the test
+	if args.strategy == "dap" then
+
+		vim.list_extend(command_args, { "--inspect-brk" })
+
+		strategy = {
+			name = 'Deno',
+			type = 'node2',
+			request = 'launch',
+			cwd = '${workspaceFolder}',
+			runtimeExecutable = 'deno',
+			runtimeArgs = command_args,
+			port = 9229,
+			protocol = 'inspector',
+			console = 'integratedTerminal',
+		}
+	end
 
 	return {
-		command = command,
+		command = 'deno ' .. table.concat(command_args, " "),
 		context = {
 			results_path = results_path,
 			position = position,
 		},
 		cwd = DenoNeotestAdapter.root(position.path),
+		strategy = strategy,
 	}
 end
 
