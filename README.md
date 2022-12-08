@@ -6,7 +6,6 @@ WIP
 
 ![neotest-deno1](https://user-images.githubusercontent.com/21696951/206565569-3d7b6489-da56-42e3-bf72-9b2599dc3a30.gif)
 
-![neotest-deno2](https://user-images.githubusercontent.com/21696951/206565583-e7c0696d-6183-4652-af18-aa74775ecb97.gif)
 
 ## Installation
 
@@ -26,9 +25,9 @@ require("neotest").set({
 })
 ```
 
-## TODO
+## Configuration
 
-### Test Support
+## Test Support
 
 - [x] Deno.test tests
 - [x] bdd - nested tests
@@ -38,8 +37,14 @@ require("neotest").set({
 - [ ] fast-check
 - [ ] Documentation tests
 
-### Features
+## DAP Support
 
-- [ ] Coverage
-- [ ] Benchmarks
-- [ ] DAP support (if possible)
+![neotest-deno2](https://user-images.githubusercontent.com/21696951/206565583-e7c0696d-6183-4652-af18-aa74775ecb97.gif)
+
+## Benchmarks
+
+TODO
+
+## Coverage
+
+TODO
