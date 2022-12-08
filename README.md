@@ -4,6 +4,10 @@ A [neotest](https://github.com/rcarriga/neotest) adapter for [deno](https://deno
 
 WIP
 
+![neotest-deno1](https://user-images.githubusercontent.com/21696951/206565569-3d7b6489-da56-42e3-bf72-9b2599dc3a30.gif)
+
+![neotest-deno2](https://user-images.githubusercontent.com/21696951/206565583-e7c0696d-6183-4652-af18-aa74775ecb97.gif)
+
 ## Installation
 
 Requires [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter).
