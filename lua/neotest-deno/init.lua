@@ -1,5 +1,6 @@
 local lib = require("neotest.lib")
-local utils = require("neotest-deno.utils");
+local utils = require("neotest-deno.utils")
+local config = require("neotest-deno.config")
 
 ---@class neotest.Adapter
 ---@field name string
@@ -14,7 +15,7 @@ function DenoNeotestAdapter.root(dir)
 
 	local result = nil
 	local root_files = vim.list_extend(
-		utils.get_additional_root_files(),
+		config.get_additional_root_files(),
 		{ "deno.json", "deno.jsonc", "import_map.json" }
 	)
 
@@ -36,7 +37,7 @@ end
 function DenoNeotestAdapter.filter_dir(name)
 
 	local filter_dirs = vim.list_extend(
-		utils.get_additional_filter_dirs(),
+		config.get_additional_filter_dirs(),
 		{ "node_modules" }
 	)
 
@@ -164,8 +165,8 @@ function DenoNeotestAdapter.build_spec(args)
 		"test",
 		position.path,
 		"--no-prompt",
-		vim.list_extend(utils.get_args(), args.extra_args or {}),
-		utils.get_allow() or "--allow-all",
+		vim.list_extend(config.get_args(), args.extra_args or {}),
+		config.get_allow() or "--allow-all",
     })
 
 	if position.type == "test" then
@@ -188,7 +189,7 @@ function DenoNeotestAdapter.build_spec(args)
 
 		strategy = {
 			name = 'Deno',
-			type = utils.get_dap_adapter(),
+			type = config.get_dap_adapter(),
 			request = 'launch',
 			cwd = '${workspaceFolder}',
 			runtimeExecutable = 'deno',
@@ -251,37 +252,37 @@ end
 setmetatable(DenoNeotestAdapter, {
 	__call = function(_, opts)
 		if utils.is_callable(opts.args) then
-			utils.get_args = opts.args
+			config.get_args = opts.args
 		elseif opts.args then
-			utils.get_args = function()
+			config.get_args = function()
 				return opts.args
 			end
 		end
 		if utils.is_callable(opts.allow) then
-			utils.get_allow = opts.allow
+			config.get_allow = opts.allow
 		elseif opts.allow then
-			utils.get_allow = function()
+			config.get_allow = function()
 				return opts.allow
 			end
 		end
 		if utils.is_callable(opts.root_files) then
-			utils.get_additional_root_files = opts.root_files
+			config.get_additional_root_files = opts.root_files
 		elseif opts.root_files then
-			utils.get_additional_root_files = function()
+			config.get_additional_root_files = function()
 				return opts.root_files
 			end
 		end
 		if utils.is_callable(opts.filter_dirs) then
-			utils.get_additional_filter_dirs = opts.filter_dirs
+			config.get_additional_filter_dirs = opts.filter_dirs
 		elseif opts.filter_dirs then
-			utils.get_additional_filter_dirs = function()
+			config.get_additional_filter_dirs = function()
 				return opts.filter_dirs
 			end
 		end
 		if utils.is_callable(opts.dap_adapter) then
-			utils.get_dap_adapter = opts.dap_adapter
+			config.get_dap_adapter = opts.dap_adapter
 		elseif opts.dap_adapter then
-			utils.get_dap_adapter = function()
+			config.get_dap_adapter = function()
 				return opts.dap_adapter
 			end
 		end
