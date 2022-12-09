@@ -1,17 +1,9 @@
-local async = require("neotest.async")
 local lib = require("neotest.lib")
+local utils = require("neotest-deno.utils");
 
 ---@class neotest.Adapter
 ---@field name string
 local DenoNeotestAdapter = { name = "neotest-deno" }
-
-local get_args = function()
-	return {}
-end
-
-local is_callable = function(obj)
-	return type(obj) == "function" or (type(obj) == "table" and obj.__call)
-end
 
 ---Find the project root directory given a current directory to work from.
 ---Should no root be found, the adapter can still be used in a non-project context if a test file matches.
@@ -20,18 +12,41 @@ end
 ---@return string | nil @Absolute root dir of test suite
 function DenoNeotestAdapter.root(dir)
 
-	-- TODO: Extend functionality to not require a deno.json file
-	local result = lib.files.match_root_pattern("deno.json")(dir)
+	local result = nil
+	local root_files = vim.list_extend(
+		utils.get_additional_root_files(),
+		{ "deno.json", "deno.jsonc", "import_map.json" }
+	)
+
+	for _, root_file in ipairs(root_files) do
+		result = lib.files.match_root_pattern(root_file)(dir)
+		if result then
+			break
+		end
+	end
+
 	return result
 end
 
 ---Filter directories when searching for test files
 ---@async
 ---@param name string Name of directory
----@param rel_path string Path to directory, relative to root
----@param root string Root directory of project
-function DenoNeotestAdapter.filter_dir(name, rel_path, root)
-	return name ~= "node_modules"
+---!param rel_path string Path to directory, relative to root
+---!param root string Root directory of project
+function DenoNeotestAdapter.filter_dir(name)
+
+	local filter_dirs = vim.list_extend(
+		utils.get_additional_filter_dirs(),
+		{ "node_modules" }
+	)
+
+	for _, filter_dir in ipairs(filter_dirs) do
+		if name == filter_dir then
+			return false
+		end
+	end
+
+	return true
 end
 
 ---@async
@@ -72,6 +87,7 @@ end
 ---@return neotest.Tree | nil
 function DenoNeotestAdapter.discover_positions(file_path)
 
+	-- TODO: discover flat tests
 	local query = [[
 ;; Deno.test
 (call_expression
@@ -131,37 +147,26 @@ function DenoNeotestAdapter.discover_positions(file_path)
 	return position_tree
 end
 
-local function get_results_file()
-
-	local tmp_dir, idx = string.match(async.fn.tempname(), "(.*)(%d+)$")
-
-	return tmp_dir .. (tonumber(idx) + 1)
-end
-
 ---@param args neotest.RunArgs
 ---@return nil | neotest.RunSpec | neotest.RunSpec[]
 function DenoNeotestAdapter.build_spec(args)
 
-	local results_path = get_results_file()
+	local results_path = utils.get_results_file()
     local position = args.tree:data()
 	local strategy = {}
 
-	local cwd = DenoNeotestAdapter.root(position.path) or ""
-	-- TODO: this needs to work with windows paths too
-	local filename, _ = string.gsub(position.path, cwd .. '/', "")
+	local cwd = assert(
+		DenoNeotestAdapter.root(position.path),
+		"could not locate root directory of " .. position.path
+	)
 
-	-- TODO: Support additional arguments
-	-- TODO: dap.adapter = "deno"
     local command_args = vim.tbl_flatten({
-		'test',
-		filename,
-		--vim.list_extend(get_args(), args.extra_args or {}),
-		'--allow-all',
+		"test",
+		position.path,
+		"--no-prompt",
+		vim.list_extend(utils.get_args(), args.extra_args or {}),
+		utils.get_allow() or "--allow-all",
     })
-
-	-- TODO: User-defined allows
-	-- if args.allow add allow args
-	-- else --allow-all
 
 	if position.type == "test" then
 
@@ -174,13 +179,16 @@ function DenoNeotestAdapter.build_spec(args)
 	end
 
 	-- BUG: Need to capture results after debugging the test
+	-- TODO: Adding additional arguments breaks debugging
+	-- need to determine if this is normal
 	if args.strategy == "dap" then
 
+		-- TODO: Allow users to specify an alternate port =HOST:PORT
 		vim.list_extend(command_args, { "--inspect-brk" })
 
 		strategy = {
 			name = 'Deno',
-			type = 'deno',
+			type = utils.get_dap_adapter(),
 			request = 'launch',
 			cwd = '${workspaceFolder}',
 			runtimeExecutable = 'deno',
@@ -190,63 +198,44 @@ function DenoNeotestAdapter.build_spec(args)
 		}
 	end
 
-	--print('deno ' .. table.concat(command_args, " "))
-
 	return {
 		command = 'deno ' .. table.concat(command_args, " "),
 		context = {
 			results_path = results_path,
 			position = position,
 		},
-		cwd = DenoNeotestAdapter.root(position.path),
+		cwd = cwd,
 		strategy = strategy,
 	}
 end
 
 ---@async
 ---@param spec neotest.RunSpec
----@param result neotest.StrategyResult
----@param tree neotest.Tree
+---!param result neotest.StrategyResult
+---!param tree neotest.Tree
 ---@return table<string, neotest.Result>
-function DenoNeotestAdapter.results(spec, result, tree)
+function DenoNeotestAdapter.results(spec)
 
-	print(spec.context.results_path)
     local results = {}
-
 	local test_suite = ''
-
 	local handle = assert(io.open(spec.context.results_path))
-
 	local line = handle:read("l")
+
+	-- TODO: ouput and short fields for failures
 	while line do
 
 		-- Next test suite
 		if string.find(line, 'running %d+ test') then
-
 			local testfile = string.match(line, 'running %d+ tests? from %.(.+%w+[sx]).-$')
 			test_suite = spec.cwd .. testfile .. "::"
 
 		-- Passed test
 		elseif string.find(line, '%.%.%. .*ok') then
-
-			local test_name = string.match(line, '^(.*) %.%.%. .*$')
-
-			if string.match(test_name, ' ') then
-				test_name = '"' .. test_name .. '"'
-			end
-
-            results[test_suite .. test_name] = { status = "passed" }
+            results[test_suite .. utils.get_test_name(line)] = { status = "passed" }
 
 		-- Failed test
 		elseif string.find(line, '%.%.%. .*FAILED') then
-
-			local test_name = string.match(line, '^(.*) %.%.%. .*$')
-
-			if string.match(test_name, ' ') then
-				test_name = '"' .. test_name .. '"'
-			end
-
-            results[test_suite .. test_name] = { status = "failed", } --short = testcase.failure[1],
+            results[test_suite .. utils.get_test_name(line)] = { status = "failed", }
 		end
 
 		line = handle:read("l")
@@ -261,11 +250,39 @@ end
 
 setmetatable(DenoNeotestAdapter, {
 	__call = function(_, opts)
-		if is_callable(opts.args) then
-			get_args = opts.args
+		if utils.is_callable(opts.args) then
+			utils.get_args = opts.args
 		elseif opts.args then
-			get_args = function()
+			utils.get_args = function()
 				return opts.args
+			end
+		end
+		if utils.is_callable(opts.allow) then
+			utils.get_allow = opts.allow
+		elseif opts.allow then
+			utils.get_allow = function()
+				return opts.allow
+			end
+		end
+		if utils.is_callable(opts.root_files) then
+			utils.get_additional_root_files = opts.root_files
+		elseif opts.root_files then
+			utils.get_additional_root_files = function()
+				return opts.root_files
+			end
+		end
+		if utils.is_callable(opts.filter_dirs) then
+			utils.get_additional_filter_dirs = opts.filter_dirs
+		elseif opts.filter_dirs then
+			utils.get_additional_filter_dirs = function()
+				return opts.filter_dirs
+			end
+		end
+		if utils.is_callable(opts.dap_adapter) then
+			utils.get_dap_adapter = opts.dap_adapter
+		elseif opts.dap_adapter then
+			utils.get_dap_adapter = function()
+				return opts.dap_adapter
 			end
 		end
 		return DenoNeotestAdapter
