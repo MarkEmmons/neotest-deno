@@ -1,7 +1,10 @@
---local async = require("plenary.async")
+local async = require("plenary.async.tests")
 local neotest_deno = require("neotest-deno")
 
-("DenoNeotestAdapter.init", function()
+local it = async.it
+local describe = async.describe
+
+describe("DenoNeotestAdapter.init", function()
 
 	it("has the correct name", function()
 
@@ -114,6 +117,18 @@ describe("DenoNeotestAdapter.is_test_file", function()
 
 end)
 
-describe("DenoNeotestAdapter.discover_positions", function()
+-- TODO: More tests!
+--describe("DenoNeotestAdapter.root", function()
+--end)
+--
+--describe("DenoNeotestAdapter.filter_dir", function()
+--end)
 
-end)
+--describe("DenoNeotestAdapter.discover_positions", function()
+--end)
+--
+--describe("DenoNeotestAdapter.build_spec", function()
+--end)
+--
+--describe("DenoNeotestAdapter.results", function()
+--end)
