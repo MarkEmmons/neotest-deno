@@ -27,6 +27,8 @@ require("neotest").set({
 
 ## Configuration
 
+TODO
+
 ## Test Support
 
 - [x] Deno.test tests
@@ -39,7 +41,7 @@ require("neotest").set({
 
 ## DAP Support
 
-![neotest-deno2](https://user-images.githubusercontent.com/21696951/206565583-e7c0696d-6183-4652-af18-aa74775ecb97.gif)
+![neotest-deno2](https://user-images.githubusercontent.com/21696951/206599082-2c1759d2-6158-41e5-9121-cb3bdb7fbe08.gif)
 
 ## Benchmarks
 
