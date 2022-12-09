@@ -5,6 +5,14 @@ local lib = require("neotest.lib")
 ---@field name string
 local DenoNeotestAdapter = { name = "neotest-deno" }
 
+local get_args = function()
+	return {}
+end
+
+local is_callable = function(obj)
+	return type(obj) == "function" or (type(obj) == "table" and obj.__call)
+end
+
 ---Find the project root directory given a current directory to work from.
 ---Should no root be found, the adapter can still be used in a non-project context if a test file matches.
 ---@async
@@ -143,10 +151,11 @@ function DenoNeotestAdapter.build_spec(args)
 	local filename, _ = string.gsub(position.path, cwd .. '/', "")
 
 	-- TODO: Support additional arguments
+	-- TODO: dap.adapter = "deno"
     local command_args = vim.tbl_flatten({
 		'test',
 		filename,
-		--vim.list_extend(args.extra_args or {}),
+		--vim.list_extend(get_args(), args.extra_args or {}),
 		'--allow-all',
     })
 
@@ -155,27 +164,33 @@ function DenoNeotestAdapter.build_spec(args)
 	-- else --allow-all
 
 	if position.type == "test" then
-		local test_name = position.name:gsub('^"', ''):gsub('"$', '')
+
+		local test_name = position.name
+		if args.strategy == "dap" then
+			test_name = test_name:gsub('^"', ''):gsub('"$', '')
+		end
+
         vim.list_extend(command_args, { "--filter", test_name })
 	end
 
-	-- BUG: Cannot jump to frame at the end of the test
+	-- BUG: Need to capture results after debugging the test
 	if args.strategy == "dap" then
 
 		vim.list_extend(command_args, { "--inspect-brk" })
 
 		strategy = {
 			name = 'Deno',
-			type = 'node2',
+			type = 'deno',
 			request = 'launch',
 			cwd = '${workspaceFolder}',
 			runtimeExecutable = 'deno',
 			runtimeArgs = command_args,
 			port = 9229,
 			protocol = 'inspector',
-			console = 'integratedTerminal',
 		}
 	end
+
+	--print('deno ' .. table.concat(command_args, " "))
 
 	return {
 		command = 'deno ' .. table.concat(command_args, " "),
@@ -195,6 +210,7 @@ end
 ---@return table<string, neotest.Result>
 function DenoNeotestAdapter.results(spec, result, tree)
 
+	print(spec.context.results_path)
     local results = {}
 
 	local test_suite = ''
@@ -204,22 +220,33 @@ function DenoNeotestAdapter.results(spec, result, tree)
 	local line = handle:read("l")
 	while line do
 
+		-- Next test suite
 		if string.find(line, 'running %d+ test') then
 
 			local testfile = string.match(line, 'running %d+ tests? from %.(.+%w+[sx]).-$')
 			test_suite = spec.cwd .. testfile .. "::"
 
+		-- Passed test
 		elseif string.find(line, '%.%.%. .*ok') then
 
 			local test_name = string.match(line, '^(.*) %.%.%. .*$')
-            results[test_suite .. test_name] = { status = "passed" }
-            results[test_suite .. '"' .. test_name .. '"'] = { status = "passed" }
 
+			if string.match(test_name, ' ') then
+				test_name = '"' .. test_name .. '"'
+			end
+
+            results[test_suite .. test_name] = { status = "passed" }
+
+		-- Failed test
 		elseif string.find(line, '%.%.%. .*FAILED') then
 
 			local test_name = string.match(line, '^(.*) %.%.%. .*$')
+
+			if string.match(test_name, ' ') then
+				test_name = '"' .. test_name .. '"'
+			end
+
             results[test_suite .. test_name] = { status = "failed", } --short = testcase.failure[1],
-            results[test_suite .. '"' .. test_name .. '"'] = { status = "failed", }
 		end
 
 		line = handle:read("l")
@@ -233,7 +260,14 @@ function DenoNeotestAdapter.results(spec, result, tree)
 end
 
 setmetatable(DenoNeotestAdapter, {
-	__call = function()
+	__call = function(_, opts)
+		if is_callable(opts.args) then
+			get_args = opts.args
+		elseif opts.args then
+			get_args = function()
+				return opts.args
+			end
+		end
 		return DenoNeotestAdapter
 	end,
 })
