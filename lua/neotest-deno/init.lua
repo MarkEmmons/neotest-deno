@@ -95,13 +95,13 @@ function DenoNeotestAdapter.discover_positions(file_path)
 	function: (member_expression) @func_name (#match? @func_name "^Deno.test$")
 	arguments: [
 		(arguments ((string) @test.name . (arrow_function)))
-		(arguments . (function name: (identifier) @test.name))
+		(arguments . (function_expression name: (identifier) @test.name))
 		(arguments . (object(pair
 			key: (property_identifier) @key (#match? @key "^name$")
 			value: (string) @test.name
 		)))
 		(arguments ((string) @test.name . (object) . (arrow_function)))
-		(arguments (object) . (function name: (identifier) @test.name))
+		(arguments (object) . (function_expression name: (identifier) @test.name))
 	]
 ) @test.definition
 
@@ -110,7 +110,7 @@ function DenoNeotestAdapter.discover_positions(file_path)
 	function: (identifier) @func_name (#match? @func_name "^describe$")
 	arguments: [
 		(arguments ((string) @namespace.name . (arrow_function)))
-		(arguments ((string) @namespace.name . (function)))
+		(arguments ((string) @namespace.name . (function_expression)))
 	]
 ) @namespace.definition
 
@@ -134,7 +134,7 @@ function DenoNeotestAdapter.discover_positions(file_path)
 	function: (identifier) @func_name (#match? @func_name "^it$")
 	arguments: [
 		(arguments ((string) @test.name . (arrow_function)))
-		(arguments ((string) @test.name . (function)))
+		(arguments ((string) @test.name . (function_expression)))
 	]
 ) @test.definition
 	]]
